@@ -1,6 +1,6 @@
 from matplotlib.patches import Polygon
 from matplotlib import pyplot as plt
-
+from collections import deque
 import numpy as np
 import operator
 import re
@@ -11,9 +11,8 @@ class DOLSystem:
         self.axiom = axiom
         self.rules = rules
         
-        self.x     = 0
-        self.y     = 0
-        self.angle = 0 
+        self.x, self.y = 0, 0
+        self.angle     = 0 
         
     def __repr__(self):
         # https://stackoverflow.com/a/24055500
@@ -27,34 +26,37 @@ class DOLSystem:
         return evolved
     
     def forward(self, distance):
-        angle  = np.radians(self.angle)
-        self.x = self.x + distance * np.cos(angle)
-        self.y = self.y + distance * np.sin(angle)
-        return self.x, self.y
+        angle   = np.radians(self.angle)
+        self.x += distance * np.cos(angle)
+        self.y += distance * np.sin(angle)
     
     def left(self, angle):
         self.angle += angle
-        return self.x, self.y
     
     def right(self, angle):
         self.angle -= angle
-        return self.x, self.y
     
-    def draw(self, angle=90, distance=5, edgecolor='w', facecolor='k', linestyle='-', linewidth=1, fname=None):
+    def draw(self, angle=90, distance=5, color='w', facecolor='k', linestyle='-', linewidth=1, fname=None):
         commands  = {
             'F': ('forward' , distance),
             '-': ('right'   , angle   ),
             '+': ('left'    , angle   )
             }
         
-        fig, ax = plt.subplots(facecolor=facecolor, clear=True)
-        polygon = Polygon([ operator.methodcaller(*commands.get(c))(self) for c in self.axiom ], closed=True, fill=None, edgecolor=edgecolor, linestyle=linestyle, linewidth=linewidth)
+        xs, ys    = deque([ self.x ]), deque([ self.y ])        
+        for c in self.axiom:
+            func, args = commands.get(c)
+            getattr(self, func)(args)
+            if func == 'forward':
+                xs.append(self.x)
+                ys.append(self.y)                
+        xs.appendleft(self.x)
+        ys.appendleft(self.y)
         
-        ax.scatter(self.x, self.y, c=facecolor) # polygon won't be shown otherwise ???
-        
+        fig, ax   = plt.subplots(facecolor=facecolor, clear=True)
         ax.set_aspect('equal', 'box')
-        ax.add_patch(polygon)
         ax.set_axis_off()
+        ax.plot(xs, ys, color=color, linestyle='-', linewidth=1)
         
         fig.tight_layout()
         if fname is None: plt.show()
@@ -64,3 +66,4 @@ class DOLSystem:
     def evolve(axiom, rules):
         evolved = ''.join(rules.get(c, c) for c in axiom)
         return DOLSystem(evolved, rules)
+
